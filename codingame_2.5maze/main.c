@@ -61,7 +61,7 @@ static int checkStepBack(struct MazeNode *treeMaze, int x, int y, int level)
                 return -1;
         }
         
-        checkStepBack(treeMaze->prev, x, y, c);
+        checkStepBack(treeMaze->prev, x, y, level);
     }
     
     return 0;
@@ -70,7 +70,7 @@ static int checkStepBack(struct MazeNode *treeMaze, int x, int y, int level)
 static void initMazeTree(struct MazeNode *treeMaze,
                          const char *maze, int x, int y, int w)
 {
-    memset(treeMaze, 0x0, sizeof(struct TreeMaze));
+    memset(treeMaze, 0x0, sizeof(struct MazeNode));
     treeMaze->x = x;
     treeMaze->y = y;
     treeMaze->c = maze[x + y * w];
@@ -86,10 +86,10 @@ static void buildMazeTree(struct MazeNode *treeMaze,
         int nx, ny, ret;
         
         // Cannot go L/R on vertical slope
-        if (treeMaze->c == '|' && (d == DIR_L || d == DIR_R)
+        if (treeMaze->c == '|' && (d == DIR_L || d == DIR_R))
             continue;
         // Cannot go U/D on horizontal slope
-        if (treeMaze->c == '-' && (d == DIR_U || d == DIR_D)
+        if (treeMaze->c == '-' && (d == DIR_U || d == DIR_D))
             continue;
         
         ret = goDir(&nx, &ny, treeMaze->x, treeMaze->y, d, w, h);
@@ -99,7 +99,7 @@ static void buildMazeTree(struct MazeNode *treeMaze,
             continue;
 
         // Don't step back
-        if (checkStepBack(treeMaze, nx, ny) != 0)
+        if (checkStepBack(treeMaze, nx, ny, treeMaze->level) != 0)
             continue;
         
         // Cannot go on high wall
@@ -123,9 +123,9 @@ static void buildMazeTree(struct MazeNode *treeMaze,
         }
 
         // Cannot cross slopes
-        if (maze[nx + ny * w] == '|' && (d == DIR_L || d == DIR_R)
+        if (maze[nx + ny * w] == '|' && (d == DIR_L || d == DIR_R))
             continue;
-        if (maze[nx + ny * w] == '-' && (d == DIR_U || d == DIR_D)
+        if (maze[nx + ny * w] == '-' && (d == DIR_U || d == DIR_D))
             continue;
 
         // A level 1 slope cannot lead to another short wall (different level of short walls not permitted)
@@ -160,6 +160,29 @@ static void buildMazeTree(struct MazeNode *treeMaze,
     }
 }
 
+static int travelMazeTree(struct MazeNode *treeMaze, int n, int endx, int endy)
+{
+    // Found the exit
+    if (treeMaze->x == endx && treeMaze->y == endy)
+        // Return the number of traversed nodes
+        return n;
+    
+    int d, ret, maxN;
+    
+    maxN = 1 << 30; // int.max
+    for (d = 0; d < NB_DIR; d++)
+    {
+        if (treeMaze->next[d] != NULL)
+        {
+            ret = travelMazeTree(treeMaze->next[d], n + 1, endx, endy);
+            if (ret < maxN)
+                maxN = ret;
+        }
+    }
+
+    return maxN;
+}
+
 // To debug: fprintf(stderr, "Debug messages...\n");
 int main()
 {
@@ -177,9 +200,12 @@ int main()
     for (int i = 0; i < h; i++)
         scanf("%s", &maze[i * w]);
     
-    struct TreeMaze treeMaze;
+    struct MazeNode treeMaze;
     initMazeTree(&treeMaze, maze, startx, starty, w);
     buildMazeTree(&treeMaze, maze, w, h);
+    
+    int n;
+    n = travelMazeTree(&treeMaze, 0, endx, endy);
 
     printf("%d\n", n);
 

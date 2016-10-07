@@ -56,12 +56,19 @@ static int checkStepBack(struct MazeNode *treeMaze, int x, int y, int level)
         // If it is the same position
         if (x == treeMaze->prev->x && y == treeMaze->prev->y)
         {
-            // If it is the same level (special bridge case)
-            if (level == treeMaze->prev->level)
+            // Bridge special case
+            if (treeMaze->prev->c == 'X')
+            {
+                if (level == treeMaze->prev->level)
+                    return -1;
+            }
+            else
                 return -1;
         }
-        
-        checkStepBack(treeMaze->prev, x, y, level);
+
+        int ret = checkStepBack(treeMaze->prev, x, y, level);
+        if (ret != 0)
+            return ret;
     }
     
     return 0;
@@ -80,7 +87,7 @@ static void buildMazeTree(struct MazeNode *treeMaze,
                           const char *maze, int w, int h)
 {
     int d;
-
+    //fprintf(stderr, "buildMazeTree(%d %d '%c' %d)\n", treeMaze->x, treeMaze->y, treeMaze->c, treeMaze->level);
     for (d = 0; d < NB_DIR; d++)
     {
         int nx, ny, ret;
@@ -97,7 +104,7 @@ static void buildMazeTree(struct MazeNode *treeMaze,
         // If cannot move, next direction
         if (ret != 0)
             continue;
-
+            
         // Don't step back
         if (checkStepBack(treeMaze, nx, ny, treeMaze->level) != 0)
             continue;
@@ -157,6 +164,8 @@ static void buildMazeTree(struct MazeNode *treeMaze,
             treeMaze->next[d]->level = 1 - treeMaze->level;
         else
             treeMaze->next[d]->level = treeMaze->level;
+        
+        buildMazeTree(treeMaze->next[d], maze, w, h);
     }
 }
 
@@ -196,9 +205,19 @@ int main()
     int h;
     int w;
     scanf("%d%d", &h, &w);
+
+    fprintf(stderr, "start=(%d %d) end=(%d %d) size=(%d %d)\n",
+            startx, starty, endx, endy, w, h);
+
     char* maze = malloc(h * w * sizeof(char));
     for (int i = 0; i < h; i++)
+    {
         scanf("%s", &maze[i * w]);
+        int j;
+        for (j = 0; j < w; j++)
+            fprintf(stderr, "%c", maze[i * w + j]);
+        fprintf(stderr, "\n");
+    }
     
     struct MazeNode treeMaze;
     initMazeTree(&treeMaze, maze, startx, starty, w);

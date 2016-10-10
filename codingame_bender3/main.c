@@ -1,3 +1,9 @@
+/*
+Comments: linear regression of the points, 1st, 2nd and 3rd derivative are calculated.
+- If B coef of samples is negative, it means it *should* be O(1). Also check B coef of ll the other derivative which should be very low.
+- If B coef of D derivative roughly equals A coef of D+1 derivative, it must be a O(n^D).
+- If B coef of D derivative is negative, it *should* be a O(n^D*log(n))
+*/
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -64,29 +70,48 @@ double sxy(const double *x, const double *y, int n, double meanX, double meanY)
     return sum;
 }
 
-void derivative(double **dx, double **dy,
-                const double *x, const double *y, int n)
+void deriv(double **dx, double **dy, int *dn,
+           const double *x, const double *y, int n)
 {
     int i;
-    *dx = malloc((n - 2) * sizeof(double));
-    *dy = malloc((n - 2) * sizeof(double));
+    *dn = n - 2;
+    *dx = malloc(*dn * sizeof(double));
+    *dy = malloc(*dn * sizeof(double));
+    double delta = x[1] - x[0];
     for (i = 1; i < n - 1; i++)
     {
-        (*dx)[i] = x[i];
-        (*dy)[i] = (y[i + 1] - y[i - 1]) / (x[i + 1] - x[i - 1]);
+        (*dx)[i-1] = x[i];
+        (*dy)[i-1] = (y[i+1] - y[i-1]) / (2 * delta);
     }
 }
 
-void derivative2(double **dx, double **dy,
-                 const double *x, const double *y, int n)
+void deriv2(double **dx, double **dy, int *dn,
+            const double *x, const double *y, int n)
 {
     int i;
-    *dx = malloc((n - 2) * sizeof(double));
-    *dy = malloc((n - 2) * sizeof(double));
+    *dn = n - 2;
+    *dx = malloc(*dn * sizeof(double));
+    *dy = malloc(*dn * sizeof(double));
+    double delta = x[1] - x[0];
     for (i = 1; i < n - 1; i++)
     {
-        (*dx)[i] = x[i];
-        (*dy)[i] = (y[i + 1] - 2 * y[i] + y[i - 1]) / ((x[i + 1] - x[i - 1]) * (x[i + 1] - x[i - 1]));
+        (*dx)[i-1] = x[i];
+        (*dy)[i-1] = (y[i+1] - 2 * y[i] + y[i-1]) / (delta * delta);
+    }
+}
+
+void deriv3(double **dx, double **dy, int *dn,
+            const double *x, const double *y, int n)
+{
+    int i;
+    *dn = n - 4;
+    *dx = malloc(*dn * sizeof(double));
+    *dy = malloc(*dn * sizeof(double));
+    double delta = x[1] - x[0];
+    for (i = 2; i < n - 2; i++)
+    {
+        (*dx)[i-2] = x[i];
+        (*dy)[i-2] = (y[i+2] - 2 * y[i+1] + 2 * y[i-1] - y[i-2]) / (2 * delta * delta * delta);
     }
 }
 
@@ -110,8 +135,8 @@ int checkO1(const double *x, const double *y, int n)
 
 int main()
 {
-    int n;  // ]5, 1000[
-    double *smpX, *smpY;
+    int n, dn;  // ]5, 1000[
+    double *smpX, *smpY, deltaT;
     
     scanf("%d", &n);
     fprintf(stderr, "N=%d\n", n);
@@ -123,10 +148,19 @@ int main()
         int num;
         int t;
         scanf("%d%d", &num, &t);
-    //fprintf(stderr, "%d %d\n", num, t);
+        //fprintf(stderr, "%d %d\n", num, t);
         // Normalize
         smpX[i] = (double)num /*/ MAX_NUM*/;
         smpY[i] = (double)t   /*/ MAX_T*/;
+        if (i == 1)
+            deltaT = smpX[i] - smpX[i - 1];
+        else if (i >= 2)
+            if (smpX[i] - smpX[i - 1] != deltaT)
+            {
+                fprintf(stderr, "%f != %f(deltatT)\n", smpX[i] - smpX[i - 1], deltaT);
+                return 0;
+            }
+
         // safety check
         /*if (smpX[i] <= 0.0 || smpX[i] > 1.0 ||
             smpY[i] <= 0.0 || smpY[i] > 1.0)
@@ -135,15 +169,20 @@ int main()
             return -1;
         }*/
     }
-    
-    double *dY, *ddY;
-    double *dX, *ddX;
+    fprintf(stderr, "Delta=%f\n", deltaT);
+
+    double *dY, *ddY, *dddY;
+    double *dX, *ddX, *dddX;
     checkO1(smpX, smpY, n);
-    derivative(&dX, &dY, smpX, smpY, n);
-    checkO1(dX, dY, n - 2);
-    derivative2(&ddX, &ddY, smpX, smpY, n);
-    checkO1(ddX, ddY, n - 2);
-    
+    deriv(&dX, &dY, &dn, smpX, smpY, n);
+    checkO1(dX, dY, dn);
+    deriv2(&ddX, &ddY, &dn, smpX, smpY, n);
+    checkO1(ddX, ddY, dn);
+    deriv3(&dddX, &dddY, &dn, smpX, smpY, n);
+    /*for (int i = 0; i < dn; i++)
+        fprintf(stderr, "d3=%f\n", dddY[i]);*/
+    checkO1(dddX, dddY, dn);
+
     enum BigO bigO = O_1;
     
     printf("%s\n", strO[bigO]);
